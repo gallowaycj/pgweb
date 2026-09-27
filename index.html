@@ -1,7 +1,6 @@
 <!doctype html>
 <html lang="en-GB">
 <head>
-<meta name="robots" content="noindex">
 <meta charset="utf-8">
 <meta name="theme-color" content="#ffffff">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -135,7 +134,8 @@ img,svg,canvas{max-width:100%}
 .sound{padding:0 1rem;background:transparent;color:var(--ink)}
 .sound[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
 @media (max-width:899px){
-  .hero-inner{padding-top:calc(var(--navh) + 44svh);justify-content:flex-start}
+  .hero canvas{top:var(--navh);bottom:auto;height:40svh}
+  .hero-inner{padding-top:calc(var(--navh) + 40svh + 1.25rem);justify-content:flex-start}
   .hero-title{order:0}.hero-copy{order:1}
   .readout{order:2;position:relative;top:auto;right:auto;width:auto;max-width:26rem}
 }
@@ -519,6 +519,7 @@ img,svg,canvas{max-width:100%}
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.outputEncoding = THREE.sRGBEncoding;
 
+    var rad = Math.PI / 180;
     var scene = new THREE.Scene();
     var camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
 
@@ -654,13 +655,18 @@ img,svg,canvas{max-width:100%}
     }, { passive: true });
 
     /* layout */
-    var wide = true;
+    var wide = true, fitDist = 12;
     function resize(){
       var w = canvas.clientWidth, h = canvas.clientHeight; if (!w || !h) return;
       renderer.setSize(w, h, false);
-      wide = w >= 900;
+      wide = window.innerWidth >= 900;
       camera.aspect = w / h;
-      camera.setViewOffset(w, h, wide ? -w * 0.17 : 0, wide ? h * 0.08 : h * 0.24, w, h);
+      var halfH = Math.tan(camera.fov * rad / 2);
+      var halfW = halfH * camera.aspect;
+      // engine is roughly 7.2 units wide and 3.8 tall; keep it inside the frame with some margin
+      fitDist = Math.max(3.7 / halfW, 2.2 / halfH) + 1.6;
+      if (wide) camera.setViewOffset(w, h, -w * 0.17, h * 0.08, w, h);
+      else camera.clearViewOffset();
       camera.updateProjectionMatrix();
     }
     if (window.ResizeObserver) new ResizeObserver(resize).observe(canvas); else window.addEventListener("resize", resize);
@@ -676,7 +682,6 @@ img,svg,canvas{max-width:100%}
     var rpmEl = document.getElementById("rpmVal");
     var tachEl = document.getElementById("tachFill");
     var visible = true, raf = 0, last = performance.now(), crank = 0, rpm = 900, lastActive = -1, lastShown = -1;
-    var rad = Math.PI / 180;
     function lerp(a, b, t){ return a + (b - a) * t; }
 
     function frame(now){
@@ -720,7 +725,7 @@ img,svg,canvas{max-width:100%}
       mx += (tmx - mx) * 0.05; my += (tmy - my) * 0.05;
       var o = engineState.orbit;
       var ang = lerp(0.8, -0.5, o) + mx * 0.12;
-      var dist = wide ? lerp(10.8, 9.2, o) : 13.5;
+      var dist = wide ? Math.max(lerp(10.8, 9.2, o), fitDist * 0.8) : fitDist;
       var hgt = lerp(3.8, 1.5, o) - my * 0.35;
       camera.position.set(Math.sin(ang) * dist, hgt, Math.cos(ang) * dist);
       camera.lookAt(0, 0.1, 0);
@@ -824,7 +829,9 @@ img,svg,canvas{max-width:100%}
     var motion = ctx.conditions.motion, wide = ctx.conditions.wide;
 
     if (motion){
-      var tl = gsap.timeline({ scrollTrigger: { trigger: ".hero", start: "top top", end: "+=100%", pin: true, scrub: 0.6, anticipatePin: 1 } });
+      var tl = gsap.timeline({ scrollTrigger: wide
+        ? { trigger: ".hero", start: "top top", end: "+=100%", pin: true, scrub: 0.6, anticipatePin: 1 }
+        : { trigger: ".hero", start: "top top", end: "bottom top", scrub: 0.6 } });
       tl.fromTo(title, { "--wdth": 88 }, { "--wdth": 125, ease: "none" }, 0)
         .fromTo(engineState, { orbit: 0 }, { orbit: 1, ease: "none" }, 0)
         .to(".hero-copy", { y: -28, ease: "none" }, 0);
